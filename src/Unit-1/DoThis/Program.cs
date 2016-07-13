@@ -1,28 +1,45 @@
 ﻿using System;
-﻿using Akka.Actor;
+using Akka.Actor;
 
 namespace WinTail
 {
+
     #region Program
-    class Program
+
+    internal class Program
     {
         public static ActorSystem MyActorSystem;
 
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             // initialize MyActorSystem
-            // YOU NEED TO FILL IN HERE
+            MyActorSystem = ActorSystem.Create("MyActorSystem");
 
             PrintInstructions();
 
+
+            var consoleWriterProps = Props.Create<ConsoleWriterActor>();
+            var consoleWriterActor = MyActorSystem.ActorOf(consoleWriterProps, "consoleWriterActor");
+
+            var validationActorProps = Props.Create(() => new ValidationActor(consoleWriterActor));
+
+            Props tailCoordinatorProps = Props.Create(() => new TailCoordinatorActor());
+            IActorRef tailCoordinatorActor = MyActorSystem.ActorOf(tailCoordinatorProps,
+                "tailCoordinatorActor");
+
+            // pass tailCoordinatorActor to fileValidatorActorProps (just adding one extra arg)
+            Props fileValidatorActorProps = Props.Create(() =>
+            new FileValidatorActor(consoleWriterActor, tailCoordinatorActor));
+            IActorRef validationActor = MyActorSystem.ActorOf(fileValidatorActorProps,
+                "validationActor");
+
             // time to make your first actors!
-            //YOU NEED TO FILL IN HERE
-            // make consoleWriterActor using these props: Props.Create(() => new ConsoleWriterActor())
-            // make consoleReaderActor using these props: Props.Create(() => new ConsoleReaderActor(consoleWriterActor))
+            var reader = MyActorSystem.ActorOf(Props.Create(() => new ConsoleReaderActor(validationActor)),
+                "consoleReaderActor");
 
+            
 
-            // tell console reader to begin
-            //YOU NEED TO FILL IN HERE
+            reader.Tell(ConsoleReaderActor.StartCommand);
 
             // blocks the main thread from exiting until the actor system is shut down
             MyActorSystem.AwaitTermination();
@@ -44,5 +61,6 @@ namespace WinTail
             Console.WriteLine("Type 'exit' to quit this application at any time.\n");
         }
     }
+
     #endregion
 }
